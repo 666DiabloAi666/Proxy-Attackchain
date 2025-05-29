@@ -1,0 +1,160 @@
+---
+
+🧠 1. System Architecture Diagram
+
++---------------------+          +----------------------------+
+| PowerShell Logging  |  ---->   |   Rust Log Collector Agent |
+| (ScriptBlock/Modules|          | (parses, enriches, queues) |
++---------------------+          +----------------------------+
+                                           |
+                                           v
++-------------------+        +---------------------------+       +---------------------+
+| ElasticSearch / DB| <----> | Python ML Anomaly Engine  | <---> | Threat Intel Feeds  |
++-------------------+        +---------------------------+       +---------------------+
+                                           |
+                                           v
++-----------------------------+     +-----------------------------+
+| Rust-based Response Engine | --> | Flutter or React Dashboard  |
+| (blocks/quarantines/alerts)|     | (analytics + forensics view)|
++-----------------------------+     +-----------------------------+
+
+
+---
+
+📝 2. PowerShell Logging Setup
+
+Group Policy Settings:
+
+Set-ItemProperty "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name EnableScriptBlockLogging -Value 1
+Set-ItemProperty "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ModuleLogging" -Name EnableModuleLogging -Value 1
+
+Windows Event Logs to Monitor:
+
+Microsoft-Windows-PowerShell/Operational
+
+Security (for logon context)
+
+
+
+---
+
+🦀 3. Rust Log Collector Agent (WMI/EventLog-based)
+
+use windows::{
+    core::*,
+    Win32::System::EventLog::*,
+};
+
+fn main() -> Result<()> {
+    // Connect to Event Log
+    let handle = unsafe {
+        OpenEventLogW(None, PCWSTR::from_raw("Microsoft-Windows-PowerShell/Operational\0".encode_utf16().collect::<Vec<u16>>().as_ptr()))
+    }?;
+
+    let mut buffer = [0u8; 4096];
+    let mut bytes_read = 0;
+    let mut min_bytes_needed = 0;
+
+    unsafe {
+        ReadEventLogW(
+            handle,
+            EVENTLOG_SEQUENTIAL_READ | EVENTLOG_FORWARDS_READ,
+            0,
+            Some(buffer.as_mut_ptr() as *mut _),
+            buffer.len() as u32,
+            &mut bytes_read,
+            &mut min_bytes_needed,
+        )?;
+    }
+
+    // Parse & send to ML engine via gRPC or queue
+    Ok(())
+}
+
+
+---
+
+🧠 4. Python ML Anomaly Detection
+
+import pandas as pd
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import LabelEncoder
+
+# Sample feature extraction
+def extract_features(logs_df):
+    logs_df['entropy'] = logs_df['command'].apply(lambda x: shannon_entropy(x))
+    logs_df['length'] = logs_df['command'].str.len()
+    return logs_df[['entropy', 'length']]
+
+# Model training
+model = IsolationForest(contamination=0.05)
+X = extract_features(training_logs)
+model.fit(X)
+
+# Scoring
+def score_new_log(log):
+    x = extract_features(pd.DataFrame([log]))
+    return model.decision_function(x)
+
+
+---
+
+🔐 5. Threat Intelligence Integration (NVD/MITRE feed example)
+
+import requests
+
+def fetch_latest_cves(product="PowerShell"):
+    r = requests.get(f"https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={product}")
+    return r.json()["vulnerabilities"]
+
+
+---
+
+🚨 6. Rust Response Orchestrator
+
+fn quarantine_user(user: &str) {
+    // Disable user account
+    Command::new("net")
+        .args(&["user", user, "/active:no"])
+        .output()
+        .expect("Failed to disable account");
+}
+
+fn block_script(script_path: &str) {
+    std::fs::remove_file(script_path).expect("Failed to remove malicious script");
+}
+
+
+---
+
+🖥️ 7. Frontend Dashboard (React + Tailwind scaffold)
+
+import React, { useEffect, useState } from 'react';
+
+export default function Dashboard() {
+  const [logs, setLogs] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/logs')
+      .then(res => res.json())
+      .then(setLogs);
+  }, []);
+
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold">PowerShell Threat Dashboard</h1>
+      <div className="mt-4">
+        {logs.map((log, i) => (
+          <div key={i} className="p-2 rounded bg-gray-100 mb-2">
+            <p><strong>Command:</strong> {log.command}</p>
+            <p><strong>User:</strong> {log.user}</p>
+            <p><strong>Risk Score:</strong> {log.risk}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+---
