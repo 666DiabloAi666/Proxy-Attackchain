@@ -1,0 +1,56 @@
+// File: src/main.rs
+// Rust-based Windows Event Log Collector for PowerShell Monitoring
+
+use windows::{
+    core::*,
+    Win32::System::EventLog::*,
+    Win32::Foundation::*
+};
+
+use std::{
+    fs::File,
+    io::Write,
+    ptr::null_mut,
+    ffi::OsString,
+    os::windows::ffi::OsStringExt
+};
+
+fn main() -> Result<()> {
+    unsafe {
+        let source_name = "Microsoft-Windows-PowerShell/Operational\0".encode_utf16().collect::<Vec<u16>>();
+        let h_event_log = OpenEventLogW(None, PCWSTR(source_name.as_ptr()));
+
+        if h_event_log == INVALID_HANDLE_VALUE {
+            panic!("Failed to open Event Log");
+        }
+
+        let mut buffer = vec![0u8; 1024 * 64];
+        let mut bytes_read: u32 = 0;
+        let mut min_bytes_needed: u32 = 0;
+
+        let read = ReadEventLogW(
+            h_event_log,
+            EVENTLOG_SEQUENTIAL_READ | EVENTLOG_FORWARDS_READ,
+            0,
+            Some(buffer.as_mut_ptr() as *mut _),
+            buffer.len() as u32,
+            &mut bytes_read,
+            &mut min_bytes_needed,
+        );
+
+        if read.as_bool() {
+            let mut file = File::create("powershell_eventlog_dump.txt").expect("Unable to create file");
+            file.write_all(&buffer[..bytes_read as usize]).expect("Write failed");
+            println!("Logs collected and dumped to file.");
+        } else {
+            println!("Failed to read Event Log");
+        }
+
+        CloseEventLog(h_event_log);
+    }
+    Ok(())
+}
+
+
+✅ **Rust Event Log Collector
+
