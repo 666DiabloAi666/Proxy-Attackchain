@@ -1,0 +1,41 @@
+// SentinelForge: Military-Grade Cyber Defense Simulator
+// Language Stack: Rust (core), Go (attack simulators), Python (ML agents)
+// Cross-Platform, Modular, Safe for Defense Simulation
+
+// ================= CORE ENGINE =====================
+// src/main.rs
+
+use std::process::Command;
+use std::fs;
+use std::path::Path;
+
+mod modules;
+mod logger;
+mod config;
+
+fn main() {
+    println!("[SentinelForge] Starting Cyber Defense Simulator...");
+
+    let cfg = config::load_config("config/attack_chains.yaml");
+    logger::init_logger();
+
+    for chain in cfg.chains.iter() {
+        println!("[+] Simulating Chain: {}", chain.name);
+        modules::simulate_chain(&chain);
+    }
+
+    println!("[SentinelForge] Simulation Complete.");
+}
+
+// ================= CONFIG =====================
+// src/config.rs
+use serde::{Deserialize};
+use std::fs;
+
+#[derive(Debug, Deserialize)]
+pub struct AttackChain {
+    pub name: String,
+    pub stages: Vec<String>,
+}
+
+#[
