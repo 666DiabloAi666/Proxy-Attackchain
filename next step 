@@ -1,0 +1,56 @@
+# File: packages/apps/NRModeSwitcher/ml/train_mode_predictor.py
+import numpy as np
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
+
+# Simulate real-world data collection
+np.random.seed(42)
+rsrp = np.random.randint(-125, -70, 500)  # realistic RSRP
+battery = np.random.randint(10, 101, 500)  # battery %
+
+# Define behavior: low RSRP and low battery prefer NSA, high RSRP and battery prefer DUAL
+labels = []
+for r, b in zip(rsrp, battery):
+    if r < -110 and b < 30:
+        labels.append(0)  # NSA
+    elif -110 <= r <= -90:
+        labels.append(1)  # SA
+    else:
+        labels.append(2)  # DUAL
+
+X = np.column_stack(((rsrp + 125) / 55, battery / 100))  # normalize to [0, 1]
+y = np.array(labels)
+
+# Split dataset
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Build model
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(16, activation='relu', input_shape=(2,)),
+    tf.keras.layers.Dense(8, activation='relu'),
+    tf.keras.layers.Dense(3, activation='softmax')
+])
+
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+model.fit(X_train, y_train, epochs=60, batch_size=32, validation_data=(X_test, y_test), verbose=2)
+
+# Save as TFLite
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+tflite_model = converter.convert()
+
+with open("mode_predictor.tflite", "wb") as f:
+    f.write(tflite_model)
+
+print("✅ Retrained mode_predictor.tflite with simulated real-world data")
+
+
+✅ The model retraining script has been upgraded with:
+
+📈 Simulated real-world data for RSRP and battery.
+
+🧠 Enhanced neural network architecture.
+
+🧪 Validation and performance logging.
+
+🔁 Automatic output of a ready-to-deploy mode_predictor.tflite.
+
