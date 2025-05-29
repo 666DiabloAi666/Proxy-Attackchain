@@ -1,0 +1,64 @@
+---
+
+1. Rust JNI Bridge (Android)
+
+// src/lib.rs
+
+#[no_mangle]
+pub extern "system" fn Java_com_example_nrmodswitcher_ModeSwitcher_predictMode(
+    env: jni::JNIEnv,
+    _class: jni::objects::JClass,
+    rsrp: jni::sys::jfloat,
+    battery: jni::sys::jfloat,
+    device_type: jni::sys::jint, // 0 = Android, 1 = Apple
+) -> jni::sys::jint {
+    // Dummy logic - replace with actual TFLite inference logic
+    if rsrp < -110.0 && battery < 30.0 {
+        0 // NSA
+    } else if rsrp <= -90.0 {
+        1 // SA
+    } else {
+        2 // DUAL
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_example_nrmodswitcher_ModeSwitcher_switchMode(
+    env: jni::JNIEnv,
+    _class: jni::objects::JClass,
+    mode: jni::sys::jint,
+) {
+    // Implement system calls or API interaction to change NR mode here.
+    // Stub for demo.
+    println!("Switching NR mode to: {}", mode);
+}
+
+Build as a dynamic lib libnrmodswitcher.so
+
+Use jni crate for JNI bindings.
+
+
+
+---
+
+2. Swift FFI Bridge (iOS)
+
+// ModeSwitcherBridge.swift
+
+import Foundation
+
+@_cdecl("predictMode")
+public func predictMode(_ rsrp: Float, _ battery: Float, _ deviceType: Int32) -> Int32 {
+    if rsrp < -105.0 && battery < 40.0 {
+        return 0 // NSA
+    } else if rsrp <= -85.0 {
+        return 1 // SA
+    } else {
+        return 2 // DUAL
+    }
+}
+
+@_cdecl("switchMode")
+public func switchMode(_ mode: Int32) {
+    // Call system API or shell commands to switch modes
+    print("Switching NR mode to:
