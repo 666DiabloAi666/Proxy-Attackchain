@@ -1,0 +1,60 @@
+# File: packages/apps/NRModeSwitcher/ml/train_mode_predictor.py
+import numpy as np
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
+
+# Sample data: [RSRP dBm, battery %] => label: 0 = NSA, 1 = SA, 2 = DUAL
+X = np.array([
+    [-120, 30], [-115, 40], [-110, 50], [-105, 60], [-100, 70],
+    [-95, 80], [-90, 90], [-85, 95], [-80, 100], [-75, 100]
+])
+
+y = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2, 2])
+
+# Normalize input
+X = (X + 120) / 220
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Define a simple model
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(8, activation='relu', input_shape=(2,)),
+    tf.keras.layers.Dense(8, activation='relu'),
+    tf.keras.layers.Dense(3, activation='softmax')
+])
+
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+model.fit(X_train, y_train, epochs=50, verbose=0, validation_data=(X_test, y_test))
+
+# Save as TFLite
+converter = tf.lite.TFLiteConverter.from_keras_model(model)
+tflite_model = converter.convert()
+
+with open("mode_predictor.tflite", "wb") as f:
+    f.write(tflite_model)
+
+print("✅ mode_predictor.tflite generated")
+
+
+✅ A minimal ML training script has been added:
+
+🧠 Trains a simple neural network to classify network mode (NSA, SA, DUAL) based on:
+
+RSRP signal strength
+
+Battery percentage
+
+
+📦 Outputs a mode_predictor.tflite file ready for integration into the Android app.
+
+
+✅ To use it:
+
+1. Run the Python script:
+
+python3 train_mode_predictor.py
+
+
+2. Copy the resulting mode_predictor.tflite to your Android device's /data/data/.../files/ directory or AOSP overlay.
+
+
+3. Rebuild or push your app.
