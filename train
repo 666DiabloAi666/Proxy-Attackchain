@@ -1,0 +1,151 @@
+1️⃣ API Endpoint: /api/analyze
+
+Request JSON format (example):
+
+{
+  "features": [0.12, 0.95, 0.1, 0.3, 0.4, 0.5, 0.8, 0.1, 0.2, 0.7]
+}
+
+Rust Handler (using Actix-web & Nero Kera Net):
+
+use actix_web::{post, web, HttpResponse, Responder};
+use serde::Deserialize;
+use tch::Tensor;
+use std::sync::Mutex;
+use crate::nero_kera::NeroKeraNet;
+
+#[derive(Deserialize)]
+struct AnalyzeRequest {
+    features: Vec<f64>,
+}
+
+#[post("/api/analyze")]
+async fn analyze(
+    nero: web::Data<Mutex<NeroKeraNet>>,
+    json: web::Json<AnalyzeRequest>
+) -> impl Responder {
+    let features = &json.features;
+    if features.len() != 10 {
+        return HttpResponse::BadRequest().body("Expected 10 features");
+    }
+    let tensor = Tensor::of_slice(&features).reshape(&[1, 10]);
+    let score = nero.lock().unwrap().analyze(tensor);
+    
+    // Log if high risk
+    if score > 0.9 {
+        log::warn!("High-risk behavior detected! Score: {}", score);
+        // You can extend this to notify dashboard or alert system
+    }
+    
+    HttpResponse::Ok().json(serde_json::json!({ "score": score }))
+}
+
+Don’t forget to register this route in your main.rs inside HttpServer::new():
+
+.service(analyze)
+
+
+---
+
+2️⃣ Dashboard: Real-Time Graph (basic example)
+
+You can add a simple JS frontend that periodically polls /api/analyze or uses WebSocket to get scores and plots them using Chart.js.
+
+Example snippet inside dashboard HTML:
+
+<canvas id="scoreChart" width="400" height="100"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('scoreChart').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Threat Score',
+        data: [],
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 2,
+        fill: false,
+      }]
+    },
+    options: {
+      animation: false,
+      scales: {
+        y: {min: 0, max: 1}
+      }
+    }
+  });
+
+  async function fetchScore() {
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({features: [Math.random(),0,0,0,0,0,0,0,0,0]}) // replace with real features
+    });
+    const data = await response.json();
+    if (chart.data.labels.length > 20) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+    }
+    chart.data.labels.push(new Date().toLocaleTimeString());
+    chart.data.datasets[0].data.push(data.score);
+    chart.update();
+  }
+
+  setInterval(fetchScore, 3000);
+</script>
+
+
+---
+
+3️⃣ Retraining Stub (Python CLI)
+
+Save as train_nero_kera.py:
+
+import torch
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
+
+class SimpleNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc = nn.Sequential(
+            nn.Linear(10, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+            nn.Sigmoid()
+        )
+    def forward(self, x):
+        return self.fc(x)
+
+def train():
+    # Dummy training data (replace with logs-based dataset)
+    X = torch.rand(100, 10)
+    y = torch.rand(100, 1)
+
+    dataset = TensorDataset(X, y)
+    loader = DataLoader(dataset, batch_size=16, shuffle=True)
+
+    model = SimpleNet()
+    optimizer = torch.optim.Adam(model.parameters())
+    loss_fn = nn.BCELoss()
+
+    for epoch in range(50):
+        for xb, yb in loader:
+            pred = model(xb)
+            loss = loss_fn(pred, yb)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        print(f"Epoch {epoch+1}, Loss: {loss.item()}")
+
+    traced = torch.jit.trace(model, torch.rand(1, 10))
+    traced.save("models/nero_kera.pt")
+    print("Model saved.")
+
+if __name__ == "__main__":
+    train()
+
+
+---
