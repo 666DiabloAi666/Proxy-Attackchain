@@ -1,0 +1,48 @@
+// File: packages/apps/NRModeSwitcher/src/moe/xzr/nrmodeswitcher/IntelligentSwitchService.java
+package moe.xzr.nrmodeswitcher;
+
+import android.app.Service;
+import android.content.Intent;
+import android.os.IBinder;
+import android.telephony.TelephonyManager;
+import android.util.Log;
+
+public class IntelligentSwitchService extends Service {
+    private static final String TAG = "NRModeIntelligence";
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Log.d(TAG, "Service created. Starting evaluation thread.");
+        new Thread(this::evaluateAndSwitch).start();
+    }
+
+    private void evaluateAndSwitch() {
+        // TODO: Replace with real feature extraction logic
+        int rsrp = getMockRSRP();
+        int battery = getMockBattery();
+        boolean isInSensitiveLocation = false; // integrate with geopolicy later
+
+        String recommendedMode;
+        if (battery < 20 || rsrp < -110) {
+            recommendedMode = "NSA";
+        } else if (isInSensitiveLocation) {
+            recommendedMode = "SA";
+        } else {
+            recommendedMode = "SA";
+        }
+
+        Log.d(TAG, "Evaluated mode: " + recommendedMode);
+        ModeController.applyMode(this, recommendedMode);
+        stopSelf();
+    }
+
+    private int getMockRSRP() {
+        return -95; // simulate medium signal
+    }
+
+    private int getMockBattery() {
+        return 45; // simulate adequate battery
+    }
+
+   
