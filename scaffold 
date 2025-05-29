@@ -1,0 +1,59 @@
+# Project scaffold for Thousand Eye: Complex Intelligent Security System
+
+# --- File: /backend/main.py (FastAPI ML backend) ---
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
+import joblib
+import torch
+import numpy as np
+from lstm_model import LSTMModel  # LSTM defined separately
+
+app = FastAPI()
+
+# Load models
+iso_forest = joblib.load("models/iso_forest.pkl")
+lstm_model = LSTMModel.load_from_checkpoint("models/lstm.ckpt")
+lstm_model.eval()
+
+class Event(BaseModel):
+    pid: int
+    user: str
+    exe: str
+    action: str
+    rule_name: str
+    timestamp: str
+
+@app.post("/analyze_firewall_event")
+async def analyze_event(event: Event):
+    features = extract_features(event)  # Your feature extraction logic
+    iso_score = iso_forest.decision_function([features])[0]
+    lstm_score = lstm_model.predict(np.array([features]))
+    threat_score = 0.5 * iso_score + 0.5 * lstm_score
+    return {"threat_score": float(threat_score)}
+
+# --- File: /agent/main.rs (Rust Actix Web Agent) ---
+use actix_web::{post, web, App, HttpServer, Responder};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+struct FirewallEvent {
+    pid: u32,
+    user: String,
+    exe: String,
+    action: String,
+    rule_name: String,
+    timestamp: String,
+}
+
+#[post("/log_event")]
+async fn log_event(event: web::Json<FirewallEvent>) -> impl Responder {
+    // Send to ML backend
+    let client = reqwest::Client::new();
+    let _res = client.post("http://127.0.0.1:8000/analyze_firewall_event")
+        .json(&*event)
+        .send().await;
+
+    format!("Received event for PID {}", event.pid)
+}
+
+#[actix
