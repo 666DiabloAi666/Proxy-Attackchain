@@ -1,0 +1,178 @@
+---
+
+📡 Complex Intelligence Design: NR Mode Supervisor
+
+🎯 Objective
+
+Create an intelligent system that:
+
+Dynamically switches 5G modes (NSA/SA) based on signal quality, battery, and threat environment.
+
+Integrates with Qualcomm radio HAL via QcrilMsgTunnelService.
+
+Includes ML-based prediction for optimal mode (SA for privacy or low latency; NSA for compatibility or throughput).
+
+Provides zero-UI control via system preferences, policy controller, and adb intent fallback.
+
+
+
+---
+
+🧠 System Components
+
+1. Mode Decision Engine (Java/Kotlin + ML Inference)
+
+Inputs:
+
+RSRP/RSRQ/SINR from TelephonyManager
+
+Current cell config (NSA or SA)
+
+Battery level
+
+App context (gaming, video call, idle)
+
+Privacy level (e.g., geofence, sensitive location)
+
+
+Model:
+
+DecisionTree or LightGBM model trained on log data
+
+Output: Recommended mode (NSA, SA, DUAL, DISABLE_5G)
+
+
+
+// Example decision logic (pseudocode)
+if (privacyLevel == HIGH && location in blacklist) {
+    switchToSA()
+} else if (rsrp < -110 || battery < 20%) {
+    switchToNSA()
+} else {
+    maintainCurrentMode()
+}
+
+
+---
+
+2. ML Data Collector Service (Android Service)
+
+Background collector stores:
+
+Radio state changes
+
+Location (obfuscated if needed)
+
+App usage at time of switch
+
+Mode switch success/failure
+
+
+Saves data in encrypted local storage, rotates logs, and uploads to training server when on Wi-Fi and idle.
+
+
+
+---
+
+3. Platform Integration (System App)
+
+platform-signed + system_ext location
+
+Provides:
+
+BroadcastReceiver for system events
+
+Settings integration via <intent> tag
+
+ContentProvider for querying current mode
+
+ShellCommandReceiver for adb shell nrswitcher --set-mode sa
+
+
+
+
+---
+
+4. Secure Policy Enforcement Layer
+
+Optional integration with:
+
+Device Policy Controller (DPC) for MDM
+
+SELinux enforcement profile for preventing unprivileged apps from altering NR settings
+
+Geo-fence & VPN awareness: if you're within a sensitive area (e.g., embassy, research base), force SA mode
+
+
+
+
+---
+
+5. UI-Less Control Surface
+
+No launcher icon by design.
+
+Control through:
+
+Settings App intent (like shown in your XML snippet)
+
+adb shell:
+
+adb shell am start -n moe.xzr.nrmodeswitcher/.MainActivity
+
+Internal System Preference:
+
+<Preference
+    android:key="nr_mode_switcher"
+    android:persistent="false"
+    android:title="5G Mode Switch"
+    android:summary="Auto-switch NSA/SA based on environment">
+    <intent
+        android:targetPackage="moe.xzr.nrmodeswitcher"
+        android:targetClass="moe.xzr.nrmodeswitcher.MainActivity" />
+</Preference>
+
+
+
+
+---
+
+🔐 Security and Intelligence Add-ons
+
+Forensic Logging: Log each switch event with anonymized data (encrypted with device key).
+
+Anomaly Detection: Use Isolation Forest to detect abnormal mode switch patterns (e.g., malware triggering NSA).
+
+Remote Kill Switch: Admins can disable 5G or enforce a mode remotely via push intent if needed.
+
+
+
+---
+
+📦 AOSP Integration
+
+To build and integrate:
+
+git clone https://github.com/YourFork/NRModeSwitcher packages/apps/NRModeSwitcher
+. build/envsetup.sh
+lunch aosp_yourdevice-userdebug
+mmm packages/apps/NRModeSwitcher
+
+APK will be at:
+
+out/target/product/<device>/system_ext/app/NRModeSwitcher/NRModeSwitcher.apk
+
+
+---
+
+✅ Optional Extensions
+
+Integration with GrapheneOS for hardened Android.
+
+Reinforcement Learning: Adapt over time to environmental feedback (using PyTorch Mobile or TFLite).
+
+Rust-powered service layer: Use JNI to call Rust logic from Java for reliability-critical components.
+
+
+
+---
