@@ -1,0 +1,218 @@
+// main.rs
+mod eye_scanner;
+mod celestial_brain;
+mod armor_shield;
+mod web_interface;
+mod audit_logger;
+mod ransomware_sim;
+mod forensic_reporter;
+mod dashboard;
+
+use actix_web::{App, HttpServer};
+use web_interface::{status, dashboard_page};
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    HttpServer::new(|| {
+        App::new()
+            .service(status)
+            .service(dashboard_page)
+    })
+    .bind("127.0.0.1:8080")?
+    .run()
+    .await
+}
+
+// eye_scanner.rs
+use sysinfo::{NetworkExt, System, SystemExt};
+
+pub fn scan_network_activity() -> Vec<String> {
+    let sys = System::new_all();
+    let mut suspects = Vec::new();
+
+    for (iface, data) in sys.networks() {
+        if data.total_received() > 1024 {
+            suspects.push(format!("Interface {} received suspicious data", iface));
+        }
+    }
+
+    suspects
+}
+
+// celestial_brain.rs
+pub fn analyze_behavior(logs: &[String]) -> Vec<String> {
+    logs.iter()
+        .filter(|line| line.contains("suspicious"))
+        .map(|s| format!("THREAT DETECTED: {}", s))
+        .collect()
+}
+
+// armor_shield.rs
+use std::process::Command;
+
+pub fn block_ip(ip: &str) {
+    let _ = Command::new("iptables")
+        .args(&["-A", "OUTPUT", "-d", ip, "-j", "DROP"])
+        .output();
+}
+
+// audit_logger.rs
+use std::fs::OpenOptions;
+use std::io::Write;
+use chrono::Local;
+
+pub fn log_event(event: &str) {
+    if let Ok(mut file) = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open("audit.log") {
+            let timestamp = Local::now();
+            let _ = writeln!(file, "[{}] {}", timestamp.format("%Y-%m-%d %H:%M:%S"), event);
+    }
+}
+
+// web_interface.rs
+use actix_web::{get, HttpResponse, Responder};
+use crate::eye_scanner::scan_network_activity;
+use crate::celestial_brain::analyze_behavior;
+use crate::audit_logger::log_event;
+use crate::ransomware_sim::simulate_ransomware;
+use crate::forensic_reporter::{generate_report, send_report};
+use crate::dashboard::generate_dashboard;
+
+#[get("/status")]
+pub async fn status() -> impl Responder {
+    let scan = scan_network_activity();
+    let analysis = analyze_behavior(&scan);
+
+    for event in &analysis {
+        log_event(event);
+    }
+
+    let report_path = generate_report(&analysis);
+    log_event(&format!("Generated forensic report: {}", report_path));
+
+    if let Err(e) = send_report(&report_path).await {
+        log_event(&format!("Failed to send report: {}", e));
+    } else {
+        log_event("Forensic report sent successfully");
+    }
+
+    HttpResponse::Ok().json(analysis)
+}
+
+#[get("/dashboard")]
+pub async fn dashboard_page() -> impl Responder {
+    let html = generate_dashboard();
+    HttpResponse::Ok().content_type("text/html").body(html)
+}
+
+// ransomware_sim.rs
+use std::fs::{self, OpenOptions};
+use std::io::{Write, Read};
+use std::path::Path;
+
+pub fn simulate_ransomware(test_dir: &str) -> Vec<String> {
+    let mut report = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(test_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                let backup_path = path.with_extension("bak");
+                if let Ok(contents) = fs::read(&path) {
+                    if let Ok(mut file) = OpenOptions::new().write(true).create(true).open(&backup_path) {
+                        let _ = file.write_all(&contents);
+                        let _ = file.write_all(b"\n[SIMULATED ENCRYPTION]");
+                        report.push(format!("Simulated encryption of: {:?}", path));
+                    }
+                }
+            }
+        }
+    }
+
+    report
+}
+
+// forensic_reporter.rs
+use std::fs::File;
+use std::io::Write;
+use chrono::Local;
+use uuid::Uuid;
+use reqwest::Client;
+
+pub fn generate_report(entries: &[String]) -> String {
+    let id = Uuid::new_v4();
+    let filename = format!("forensic_{}.log", id);
+
+    if let Ok(mut file) = File::create(&filename) {
+        let timestamp = Local::now();
+        let _ = writeln!(file, "Forensic Report - {}", timestamp);
+        for entry in entries {
+            let _ = writeln!(file, "{}", entry);
+        }
+    }
+
+    filename
+}
+
+pub async fn send_report(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::new();
+    let content = std::fs::read_to_string(path)?;
+    let response = client.post("https://your-secure-endpoint.example.com/forensic")
+        .body(content)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err("Failed to send forensic report".into())
+    }
+}
+
+// dashboard.rs
+use std::fs;
+
+pub fn generate_dashboard() -> String {
+    let log = fs::read_to_string("audit.log").unwrap_or_else(|_| "No audit log found".to_string());
+    format!("<html><head><title>Thousand Eye Dashboard</title></head><body><h1>Threat Dashboard</h1><pre>{}</pre></body></html>", log)
+}
+
+// Cargo.toml
+[package]
+name = "thousand_eye_program"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4"
+sysinfo = "0.30"
+chrono = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+reqwest = { version = "0.11", features = ["json", "blocking", "rustls-tls"] }
+tokio = { version = "1", features = ["full"]" }
+
+
+✅ Dashboard integrated!
+
+Access it at http://127.0.0.1:8080/dashboard
+
+Displays real-time audit logs from audit.log
+
+Updated dynamically as threats are detected and logged
+
+
+Would you like:
+
+A chart-based UI (e.g., threat trends)?
+
+Filtering and search?
+
+Remote authenticated dashboard access?
+
+
+Just say the word.
+
