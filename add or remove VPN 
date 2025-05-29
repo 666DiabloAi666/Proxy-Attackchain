@@ -1,0 +1,50 @@
+---
+
+1️⃣ Full React Frontend Dashboard
+
+Complete React app with:
+
+Real-time threat score graph (Chart.js)
+
+Retrain button calling /api/retrain
+
+Logs viewer panel (stream logs via WebSocket or polling)
+
+
+Instructions for building & serving (with Actix static files or standalone)
+
+
+
+---
+
+2️⃣ WireGuard Server Config Generator Script
+
+Rust CLI tool to:
+
+Generate WireGuard private/public keys
+
+Create peer config files for clients
+
+Manage /etc/wireguard/wg0.conf additions safely
+
+
+Basic peer management commands: add, revoke, list
+
+
+
+---
+
+3️⃣ Rust VPN Management Utilities
+
+Rust modules to:
+
+Interface with wg command for status & control
+
+Dynamically reload WireGuard config (via wg-quick)
+
+Expose API endpoints to add/remove VPN clients securely
+
+
+
+
+---
