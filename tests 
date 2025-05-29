@@ -1,0 +1,34 @@
+
+---
+
+1️⃣ Test API Endpoint for Threat Scoring
+
+POST /api/analyze
+
+Accepts JSON threat vectors (e.g., list of floats)
+
+Returns a JSON score from Nero Kera Net
+
+
+
+---
+
+2️⃣ Dashboard Integration
+
+Display real-time graph of threat scores over time
+
+Log high-risk alerts when score > threshold
+
+
+
+---
+
+3️⃣ Retraining Pipeline Trigger
+
+Endpoint or CLI to start retraining nero_kera.pt from logs
+
+Optional webhook to trigger retraining on schedule
+
+
+
+---
