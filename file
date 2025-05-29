@@ -1,0 +1,100 @@
+// File: packages/apps/NRModeSwitcher/src/moe/xzr/nrmodeswitcher/IntelligentSwitchService.java
+package moe.xzr.nrmodeswitcher;
+
+import android.app.Service;
+import android.content.Intent;
+import android.os.BatteryManager;
+import android.os.IBinder;
+import android.telephony.CellSignalStrength;
+import android.telephony.CellInfo;
+import android.telephony.TelephonyManager;
+import android.util.Log;
+
+import java.util.List;
+
+public class IntelligentSwitchService extends Service {
+    private static final String TAG = "NRModeIntelligence";
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Log.d(TAG, "Service created. Starting evaluation thread.");
+        new Thread(this::evaluateAndSwitch).start();
+    }
+
+    private void evaluateAndSwitch() {
+        int rsrp = getCurrentRSRP();
+        int battery = getBatteryLevel();
+        boolean isInSensitiveLocation = false; // TODO: Integrate with geopolicy later
+
+        String recommendedMode;
+        if (battery < 20 || rsrp < -110) {
+            recommendedMode = "NSA";
+        } else if (isInSensitiveLocation) {
+            recommendedMode = "SA";
+        } else {
+            recommendedMode = "SA";
+        }
+
+        Log.d(TAG, "Evaluated mode: " + recommendedMode);
+        ModeController.applyMode(this, recommendedMode);
+        stopSelf();
+    }
+
+    private int getCurrentRSRP() {
+        TelephonyManager telephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
+        List<CellInfo> cellInfoList = telephonyManager.getAllCellInfo();
+        if (cellInfoList != null) {
+            for (CellInfo cellInfo : cellInfoList) {
+                if (cellInfo instanceof CellInfo) {
+                    CellSignalStrength signalStrength = cellInfo.getCellSignalStrength();
+                    return signalStrength.getDbm();
+                }
+            }
+        }
+        return -120; // Default if unavailable
+    }
+
+    private int getBatteryLevel() {
+        BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+}
+
+
+// File: packages/apps/NRModeSwitcher/src/moe/xzr/nrmodeswitcher/ModeController.java
+package moe.xzr.nrmodeswitcher;
+
+import android.content.Context;
+import android.util.Log;
+import android.os.SystemProperties;
+
+public class ModeController {
+    public static void applyMode(Context context, String mode) {
+        Log.d("NRModeControl", "Applying mode: " + mode);
+        switch (mode) {
+            case "SA":
+                SystemProperties.set("persist.radio.nr_mode", "1");
+                break;
+            case "NSA":
+                SystemProperties.set("persist.radio.nr_mode", "2");
+                break;
+            case "DUAL":
+                SystemProperties.set("persist.radio.nr_mode", "3");
+                break;
+            case "DISABLE_5G":
+                SystemProperties.set("persist.radio.nr_mode", "0");
+                break;
+            default:
+                Log.e("NRModeControl", "Unknown mode: " + mode);
+        }
+    }
+}
+
+
+✅ Update complete: The intelligent switcher now uses real-time RSRP signal strength and battery percentage from the Android system instead of mock data.
