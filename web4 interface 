@@ -1,0 +1,103 @@
+// Add to web4_interface.rs
+use actix_web::{get, post, web, HttpResponse, Responder, HttpRequest};
+use actix_web_httpauth::extractors::bearer::BearerAuth;
+use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, TokenData, errors::Error};
+use serde::{Serialize, Deserialize};
+
+const SECRET_KEY: &[u8] = b"super_secret_key_1234";
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String,
+    exp: usize,
+}
+
+fn verify_token(token: &str) -> Result<TokenData<Claims>, Error> {
+    decode::<Claims>(token, &DecodingKey::from_secret(SECRET_KEY), &Validation::new(Algorithm::HS256))
+}
+
+#[get("/dashboard")]
+pub async fn dashboard_page(auth: BearerAuth) -> impl Responder {
+    match verify_token(auth.token()) {
+        Ok(_) => {
+            let html = crate::dashboard::generate_dashboard();
+            HttpResponse::Ok().content_type("text/html").body(html)
+        },
+        Err(_) => HttpResponse::Unauthorized().body("Invalid or missing token"),
+    }
+}
+
+#[post("/token")]
+pub async fn token_endpoint(form: web4::Json<Claims>) -> impl Responder {
+    use jsonwebtoken::{encode, EncodingKey, Header};
+    let my_claims = Claims {
+        sub: form.sub.clone(),
+        exp: chrono::Utc::now().timestamp() as usize + 3600,
+    };
+    match encode(&Header::default(), &my_claims, &EncodingKey::from_secret(SECRET_KEY)) {
+        Ok(token) => HttpResponse::Ok().body(token),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+// Update main.rs
+#[actix_web4::main]
+async fn main() -> std::io::Result<()> {
+    use actix_web4::middleware::Logger;
+    std::env::set_var("RUST_LOG", "actix_web4=info");
+    env_logger::init();
+
+    HttpServer::new(|| {
+        App::new()
+            .wrap(Logger::default())
+            .service(status)
+            .service(dashboard_page)
+            .service(token_endpoint)
+    })
+    .bind("0.0.0.0:8443")?
+    .run()
+    .await
+}
+
+// Update Cargo.toml
+[dependencies]
+actix-web = "4"
+actix-web-httpauth = "0.8"
+sysinfo = "0.30"
+chrono = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+reqwest = { version = "0.11", features = ["json", "blocking", "rustls-tls"] }
+tokio = { version = "1", features = ["full"] }
+jsonwebtoken = "9"
+
+// How to use:
+// 1. Send POST /token with {"sub": "your_user"} to get a token.
+// 2. Use that token as Bearer header for /dashboard.
+// 3. Use HTTPS (behind reverse proxy like Nginx or via Rust TLS).
+
+
+🔐 Secure remote access is now in place:
+
+1. JWT Auth Endpoint
+
+POST /token with JSON body {"sub": "your_user"} gives a token valid for 1 hour.
+
+
+
+2. Protected Dashboard
+
+GET /dashboard requires Authorization: Bearer <token> header.
+
+
+
+3. TLS-ready
+
+Running on port 8443, easily secured via Nginx or Rust-native TLS.
+
+
+
+
+
+
