@@ -1,0 +1,109 @@
+// dashboard.rs
+use std::fs;
+use serde::Serialize;
+use chrono::NaiveDateTime;
+
+#[derive(Serialize)]
+struct DashboardEntry {
+    timestamp: String,
+    event: String,
+}
+
+fn parse_log_line(line: &str) -> Option<DashboardEntry> {
+    if let Some((ts, msg)) = line.split_once("] ") {
+        let ts_clean = ts.trim_start_matches('[');
+        Some(DashboardEntry {
+            timestamp: ts_clean.to_string(),
+            event: msg.to_string(),
+        })
+    } else {
+        None
+    }
+}
+
+pub fn generate_dashboard() -> String {
+    let log = fs::read_to_string("audit.log").unwrap_or_else(|_| "".to_string());
+    let entries: Vec<DashboardEntry> = log
+        .lines()
+        .filter_map(parse_log_line)
+        .collect();
+
+    let json_data = serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string());
+
+    format!(r#"
+    <html>
+    <head>
+        <title>Thousand Eye Dashboard</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {{ font-family: sans-serif; padding: 1rem; }}
+            canvas {{ max-width: 600px; }}
+        </style>
+    </head>
+    <body>
+        <h1>Threat Dashboard</h1>
+        <input type="text" id="search" placeholder="Filter events" onkeyup="filterTable()">
+        <table id="logTable" border="1">
+            <thead><tr><th>Timestamp</th><th>Event</th></tr></thead>
+            <tbody id="logBody"></tbody>
+        </table>
+        <h2>Threat Trend</h2>
+        <canvas id="trendChart"></canvas>
+
+        <script>
+            const data = {json_data};
+            const tbody = document.getElementById('logBody');
+            data.forEach(entry => {{
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${{entry.timestamp}}</td><td>${{entry.event}}</td>`;
+                tbody.appendChild(row);
+            }});
+
+            function filterTable() {{
+                const query = document.getElementById('search').value.toLowerCase();
+                const rows = document.querySelectorAll('#logTable tbody tr');
+                rows.forEach(row => {{
+                    row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+                }});
+            }}
+
+            const counts = {{}};
+            data.forEach(e => {{
+                const date = e.timestamp.split(' ')[0];
+                counts[date] = (counts[date] || 0) + 1;
+            }});
+            const labels = Object.keys(counts);
+            const chartData = Object.values(counts);
+
+            new Chart(document.getElementById('trendChart'), {{
+                type: 'line',
+                data: {{
+                    labels: labels,
+                    datasets: [{{
+                        label: 'Threats per Day',
+                        data: chartData,
+                        borderColor: 'red',
+                        tension: 0.3,
+                    }}]
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    "#)
+}
+
+
+✅ Your real-time dashboard now includes:
+
+📊 Chart.js graph of threats per day
+
+🔍 Searchable/filterable event log
+
+🧠 Auto-parsed logs with timestamps
+
+🔐 (Next step) Remote access + authentication
+
+
+Would you like secure remote login with JWT or basic auth? Want to host this via HTTPS with TLS certs?
+
